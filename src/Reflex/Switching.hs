@@ -42,14 +42,12 @@ instance (SwitchConcat t a, SwitchConcat t b) => SwitchConcat t (a, b) where
   switchConcat initial e = liftA2 (,) (switchConcat' a) (switchConcat' b)
       where (a, b) = split $ UpdatedMap initial e
 
-
-
 -- This will hopefully become a primitive (faster!)
-switchMergeEvents ::  (MonadFix m, MonadHold t m, Reflex t, Ord k) => Map k (Event t a) -> Event t (Map k (Maybe (Event t a))) -> m (Event t (Map k a))
-switchMergeEvents initial updates = switchMergeMap initial $ fmap (fromMaybe never) <$> updates
+switchMergeEvents ::  (MonadFix m, MonadHold t m, Reflex t, Ord k) => UpdatedMap t k (Event t a)  -> m (Event t (Map k a))
+switchMergeEvents mapChanges = switch . fmap mergeMap <$> holdMap mapChanges
 
 instance (Semigroup a, Reflex t) => SwitchConcat t (Event t a) where
-  switchConcat initial updates = fmap (foldl1 (<>)) <$> switchMergeEvents initial updates
+  switchConcat initial updates = fmap (foldl1 (<>)) <$> switchMergeEvents (UpdatedMap initial updates)
 
 
 instance (Monoid a, Reflex t) => SwitchConcat t (Behavior t a) where
@@ -77,7 +75,7 @@ instance (Reflex t) => SwitchConcat t () where
   switchConcat _ _ = pure ()
 
 
-instance (Monoid a, Reflex t) => Switching t (Behavior t a)  where
+instance (Reflex t) => Switching t (Behavior t a)  where
   switching = switcher
 
 instance Reflex t => Switching t (Event t a) where
@@ -88,12 +86,12 @@ instance (Reflex t) => Switching t () where
 
 
 -- | Helper which takes an UpdatedMap as one argument (instead of initial value, update event separately)
-switchConcat' :: (Reflex t, SwitchConcat t r, MonadFix m, MonadHold t m, Ord k) => UpdatedMap t k r -> m r
+switchConcat' :: (SwitchConcat t r, MonadFix m, MonadHold t m, Ord k) => UpdatedMap t k r -> m r
 switchConcat' (UpdatedMap initial e) = switchConcat initial e
 
 
 -- | Helper which takes an Updated as one argument (instead of initial value, update event separately)
-switching' :: (Reflex t, Switching t r, MonadFix m, MonadHold t m) => Updated t r -> m r
+switching' :: (Switching t r, MonadHold t m) => Updated t r -> m r
 switching' (Updated initial e) = switching initial e
 
 
